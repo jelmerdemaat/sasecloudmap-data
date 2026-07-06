@@ -2,7 +2,6 @@ import importlib
 import sys
 from pathlib import Path
 
-
 PROVIDER_DIR = Path(__file__).resolve().parent.parent / "provider_data"
 
 
@@ -111,6 +110,60 @@ def test_cloudflare_output_uses_city_country_and_site_code(monkeypatch):
         "city": "AGR",
         "countryCode": "IN",
         "siteCode": "AGR",
+    }
+
+
+def test_akamai_output_uses_city_and_site_code(monkeypatch):
+    akamai_geojson = import_provider_module(monkeypatch, "akamai_geojson")
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "core": [
+                    {
+                        "name": "Amsterdam",
+                        "status": "existing",
+                        "region": "EMEA",
+                        "latitude": "52.368",
+                        "longitude": "4.904",
+                        "type": "core",
+                    }
+                ],
+                "distributed": [],
+                "edge": [
+                    {
+                        "name": "Amsterdam",
+                        "status": "existing",
+                        "region": "",
+                        "latitude": "52.35",
+                        "longitude": "4.92",
+                        "type": "edge",
+                    },
+                    {
+                        "name": "Zurich",
+                        "status": "existing",
+                        "region": "",
+                        "latitude": "47.37",
+                        "longitude": "8.55",
+                        "type": "edge",
+                    },
+                ],
+            }
+
+    monkeypatch.setattr(akamai_geojson.httpx, "get", lambda *_, **__: Response())
+
+    locations = akamai_geojson.get_data()
+    features = akamai_geojson.convert_to_geojson(locations)
+
+    assert len(features) == 2
+    assert features[0]["properties"] == {
+        "city": "Amsterdam",
+    }
+    assert features[1]["properties"] == {
+        "city": "Zurich",
     }
 
 
